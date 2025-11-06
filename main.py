@@ -54,3 +54,4 @@ def plotImagepair(image1, image2, title1="Image 1", title2="Image 2"):
 plotImagepair(gray1, gray2, title1="Image 1 - HE", title2="Image 2 - AMACR")
 
 # testing
+#hello0
