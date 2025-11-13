@@ -16,7 +16,7 @@ def sift_extractor(img, extractor):
 def mach_features(img1, img2, extractor, num=0, plot=False):
     kp1, desc1 = sift_extractor(img1, extractor)
     kp2, desc2 = sift_extractor(img2, extractor)
-    matches = match_descriptors(desc1, desc2, max_ratio=0.77, cross_check=True)
+    matches = match_descriptors(desc1, desc2, max_ratio=0.9, cross_check=True)
     print(f"Pair {num+1}: {len(matches)} raw matches found.")
 
     if plot:
@@ -73,7 +73,7 @@ def similarity_transformation(X, Y):
     return s, R, t
 
 
-def ransac_rigid(X, Y, n_iters=2000, threshold=1.0):
+def ransac_rigid(X, Y, n_iters=5000, threshold=3.0):
     N = X.shape[0]
     best_inliers = np.zeros(N, dtype=bool)
     best_count = 0
@@ -97,7 +97,7 @@ def ransac_rigid(X, Y, n_iters=2000, threshold=1.0):
     return best_R, best_t, best_inliers
 
 
-def ransac_similarity(X, Y, n_iters=2000, threshold=1.0):
+def ransac_similarity(X, Y, n_iters=5000, threshold=5.0):
     N = X.shape[0]
     best_inliers = np.zeros(N, dtype=bool)
     best_count = 0
@@ -121,29 +121,6 @@ def ransac_similarity(X, Y, n_iters=2000, threshold=1.0):
     return best_s, best_R, best_t, best_inliers
 
 
-    """
-    Visualize alignment results.
-    - If overlay=True → show blended overlay (alignment)
-    - If overlay=False → show aligned vs target side-by-side
-    """
-    if overlay:
-        plt.figure(figsize=(8, 8))
-        blend = cv2.addWeighted(gray2, 0.5, aligned, 0.5, 0)
-        plt.imshow(blend, cmap='gray')
-        plt.title(f"{title_prefix}: Overlay View")
-        plt.axis('off')
-        plt.show()
-    else:
-        fig, axs = plt.subplots(1, 2, figsize=(12, 6))
-        axs[0].imshow(aligned, cmap='gray')
-        axs[0].set_title(f"{title_prefix}: Aligned (Transformed)")
-        axs[1].imshow(gray2, cmap='gray')
-        axs[1].set_title(f"{title_prefix}: Target")
-        for a in axs:
-            a.axis('off')
-        plt.tight_layout()
-        plt.show()
-
 def show_alignment(img1, img2, aligned, title_prefix="", overlay=False):
     """
     Show alignment either side-by-side or as an overlay blend.
@@ -160,6 +137,7 @@ def show_alignment(img1, img2, aligned, title_prefix="", overlay=False):
         plt.axis('off')
         plt.tight_layout()
         plt.show()
+
     else:
         # Side-by-side view
         fig, axs = plt.subplots(1, 2, figsize=(14, 6))
@@ -171,6 +149,7 @@ def show_alignment(img1, img2, aligned, title_prefix="", overlay=False):
             a.axis('off')
         plt.tight_layout()
         plt.show()
+    
 
 
 # =========================================================
@@ -269,7 +248,7 @@ def run_collection1(plot_example=True, overlay=False):
         results.append((i+1, len(matches), np.sum(inliers), theta, tmag))
 
         # --- Only visualize first pair for clarity
-        if plot_example and i == 22:
+        if plot_example:
             M = np.hstack([R, t.reshape(2, 1)])
             aligned = cv2.warpAffine(gray1, M, (gray2.shape[1], gray2.shape[0]))
 
@@ -303,7 +282,7 @@ def run_collection2(plot_example=True, overlay=False):
     results = []
 
 
-    for i in range(5):
+    for i in range(n_pairs):
         gray1, gray2 = images1[i], images2[i]
         matches, kp1, kp2 = mach_features(gray1, gray2, sift, num=i, plot=False)
         if len(matches) < 6:
@@ -317,7 +296,7 @@ def run_collection2(plot_example=True, overlay=False):
         tmag = np.linalg.norm(t)
         results.append((i+1, len(matches), np.sum(inliers), s, theta, tmag))
 
-        if plot_example and i == 0:
+        if plot_example:
             M = np.hstack([s * R, t.reshape(2, 1)]) if "s" in locals() else np.hstack([R, t.reshape(2, 1)])
             aligned = cv2.warpAffine(gray1, M, (gray2.shape[1], gray2.shape[0]))
             show_alignment(gray1, gray2, aligned,
