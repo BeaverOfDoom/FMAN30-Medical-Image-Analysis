@@ -20,7 +20,8 @@ def show_manual_segmentation(man_seg, images, pat_nbr=1):
     img = images[:, :, pat_nbr - 1]
 
     plt.figure()
-    plt.imshow(img, cmap="gray")
+    plt.imshow(img, cmap="gray", origin="upper")
+    plt.gca().invert_yaxis()
     plt.axis("equal")
     plt.axis("off")
     draw_shape(man_seg.squeeze(), ".-r")
@@ -33,7 +34,8 @@ def show_model_shapes(models, images, pat_nbr=1):
     img = images[:, :, pat_nbr - 1]
 
     plt.figure()
-    plt.imshow(img, cmap="gray")
+    plt.imshow(img, cmap="gray", origin="upper")
+    plt.gca().invert_yaxis()
     plt.axis("equal")
     plt.axis("off")
 
