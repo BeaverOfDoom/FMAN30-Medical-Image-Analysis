@@ -251,48 +251,35 @@ close(GUI.Fig);
 
 %---------------------------
 function calculatespeedimage
-%---------------------------
-%Calculate speed image. Here, use your imagination to calculate a good
-%speed image based on image intensity at the seed, slider settings,
-%and different features from the image.
-
 global GUI
 
-%%%% --- Calculate speed image
-%Replace this code. This is likely going to be several lines of code
-%involving one or more sliders and mix pre-processing such as filtering,
-%edge detection or whatever you can come up with. Note that your function
-%may very well be nonlinear. Remember the speed function should be high for
-%values that you want to include and low were you want the expansion to 
-%stop/slow down. Have fun!
+I = double(GUI.IM);
 
-%Calculate the intensity at the seed in case it is useful.
-intensityatseed = GUI.IM(GUI.YSeed,GUI.XSeed);
+% --- Seed intensity
+I0 = I(GUI.YSeed, GUI.XSeed);
 
-%Just anything for now, replace here!
-GUI.SPEED = (GUI.IM-GUI.IM-intensityatseed)*GUI.Slider1;
-GUI.SPEED(GUI.SPEED<1e-2) = 1e-2;
+% --- Slider 1: intensity tolerance
+sigma = 1 + 5*GUI.Slider1;
 
+% --- Speed: intensity similarity to seed
+region = exp( - (I - I0).^2 / (2*sigma^2) );
+
+% --- Avoid zero speed
+eps0 = 1e-3;
+GUI.SPEED = eps0 + region;
+ 
+% --- Run fast marching (unchanged)
 tic;
 switch get(GUI.Handles.methodlistbox,'value')
-  case 1
-    %Full code
-    GUI.MAP = msfm2d(GUI.SPEED,[GUI.YSeed;GUI.XSeed],true,true); %Call the fast marching code.
-  case 2
-    %No curve    
-    GUI.MAP = msfm2d(GUI.SPEED,[GUI.YSeed;GUI.XSeed],false,true); %Call the fast marching code.    
-  case 3
-    %No cross
-    GUI.MAP = msfm2d(GUI.SPEED,[GUI.YSeed;GUI.XSeed],true,false); %Call the fast marching code.        
-  case 4
-    GUI.MAP = msfm2d(GUI.SPEED,[GUI.YSeed;GUI.XSeed],false,false); %Call the fast marching code.            
-  case 5
-    startind = round(GUI.XSeed)*size(GUI.IM,1)+round(GUI.YSeed); %Calculate startindex
-    try
-      GUI.MAP = fastmarch(single(1./GUI.SPEED),single(startind),1e10); %Call the fast marching code.    
-    catch me
-      error('The function fastmarch does not seem to be compiled.');
-    end
+    case 1
+        GUI.MAP = msfm2d(GUI.SPEED,[GUI.YSeed;GUI.XSeed],true,true);
+    case 2
+        GUI.MAP = msfm2d(GUI.SPEED,[GUI.YSeed;GUI.XSeed],false,true);
+    case 3
+        GUI.MAP = msfm2d(GUI.SPEED,[GUI.YSeed;GUI.XSeed],true,false);
+    case 4
+        GUI.MAP = msfm2d(GUI.SPEED,[GUI.YSeed;GUI.XSeed],false,false);
 end
 t = toc;
 set(GUI.Handles.calculationtimetext,'string',sprintf('Calculation time: %0.5g [s]',t));
+

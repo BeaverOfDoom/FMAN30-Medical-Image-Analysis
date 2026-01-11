@@ -31,8 +31,14 @@ fseek(fid,info.StartOfPixelData,'bof');
 switch info.BitsAllocated
   case 8
     im = fread(fid,datasize,'*uint8'); %8 bit reader
-  case 16
-    im = fread(fid,datasize,'*int16'); %16 bit reader
+ case 16
+  if isfield(info,'PixelRepresentation') && double(info.PixelRepresentation)==0
+      im = fread(fid,datasize,'*uint16'); % unsigned 16-bit
+  else
+      im = fread(fid,datasize,'*int16');  % signed 16-bit
+  end
+
+
   otherwise
     fclose(fid);
     error('Wrong bit-depth.');
@@ -44,7 +50,7 @@ fclose(fid);
 %%%% Reshape the image. Add code here %%%%
 
 im = reshape(im, [double(info.Columns), double(info.Rows)])';
-im = double(im);
+im = double(im); 
 
 %%%% Rescale image to true intensities. Add code here %%%%
 if isfield(info,'RescaleSlope') && isfield(info,'RescaleIntercept') && ...
