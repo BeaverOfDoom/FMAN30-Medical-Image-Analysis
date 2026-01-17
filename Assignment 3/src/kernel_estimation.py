@@ -2,19 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import norm
 
-# -------------------------------------------------
-# Global settings
-# -------------------------------------------------
-
+# Global parameters for the two classes
 np.random.seed(0)
 m1, m2 = 0.0, 1.0
 prior1 = prior2 = 0.5
 
 
-# -------------------------------------------------
-# Data generation
-# -------------------------------------------------
-
+# Generate training and test data for both classes
 def generate_data(smodel):
     x1_train = np.random.normal(m1, smodel, 10)
     x2_train = np.random.normal(m2, smodel, 10)
@@ -23,10 +17,7 @@ def generate_data(smodel):
     return x1_train, x2_train, x1_test, x2_test
 
 
-# -------------------------------------------------
-# Parzen window KDE
-# -------------------------------------------------
-
+# Parzen estimator with gaussian kernel. Spits out the density estimates at points x given the training data and window width h (s_parzen)
 def parzen_estimate(x, train_data, h):
     p = np.zeros_like(x, dtype=float)
     for xi in train_data:
@@ -34,25 +25,22 @@ def parzen_estimate(x, train_data, h):
     return p / len(train_data)
 
 
-# -------------------------------------------------
-# Utility functions
-# -------------------------------------------------
-
+# Making the grid for plotting with some margin to see trails
 def make_x_grid(x1, x2):
     return np.linspace(min(x1.min(), x2.min()) - 3,
                        max(x1.max(), x2.max()) + 3, 1000)
 
-
+# The actual underlying densities we are trying to estimate
 def true_density(x, mean, smodel):
     return norm.pdf(x, mean, smodel)
 
-
+# The plugin bayes rule for equal priors
 def plugin_predict(x, x1_train, x2_train, h):
     p1 = parzen_estimate(x, x1_train, h)
     p2 = parzen_estimate(x, x2_train, h)
     return np.where(p1 > p2, 1, 2)
 
-
+# Leave-one-out cross-validation error for given h
 def loocv_error(x1, x2, h):
     errors = 0
     total = 0
@@ -74,10 +62,8 @@ def loocv_error(x1, x2, h):
     return errors / total
 
 
-# -------------------------------------------------
-# Plotting helpers
-# -------------------------------------------------
 
+# Plotting 
 def plot_densities(x, p1_true, p2_true, p1_est, p2_est, x1, x2, smodel, sparzen):
     plt.figure(figsize=(8,5))
     plt.plot(x, p1_true, 'b--', label='p(x|y=1) true')
@@ -102,10 +88,7 @@ def plot_posteriors(x, post_true, post_est, smodel, sparzen):
     plt.show()
 
 
-# -------------------------------------------------
-# Experiment runner
-# -------------------------------------------------
-
+# Run experiment
 def run_experiment(smodel, sparzen):
     x1_tr, x2_tr, x1_te, x2_te = generate_data(smodel)
     x = make_x_grid(x1_tr, x2_tr)
@@ -138,12 +121,10 @@ def run_experiment(smodel, sparzen):
     plot_posteriors(x, post_true, post_est, smodel, sparzen)
 
 
-# -------------------------------------------------
 # Main
-# -------------------------------------------------
-
 if __name__ == "__main__":
 
+# Run for different s_model and s_parzen
     for smodel in [0.4, 4]:
         for sparzen in [0.02, 1.0]:
             run_experiment(smodel, sparzen)

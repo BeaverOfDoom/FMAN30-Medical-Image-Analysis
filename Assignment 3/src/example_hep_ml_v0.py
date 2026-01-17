@@ -11,112 +11,36 @@ from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 
 def read_hep2_dataset():
-
-    # Get the folder where THIS script is located
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-
-    # Build the path to Assignment 3/data/databases
-    data_dir = os.path.join(base_dir, "..", "data", "databases")
-
-    # Make absolute paths
-    mask_path = os.path.join(data_dir, "hep_proper_mask.mat")
-    v2_path   = os.path.join(data_dir, "hep_proper_v2.mat")
-
-    # Load mask file
-    mat_content = scipy.io.loadmat(mask_path)
-    X1_masks = np.transpose(mat_content['Y1'], (3, 0, 1, 2)).astype(bool)
-    X2_masks = np.transpose(mat_content['Y2'], (3, 0, 1, 2)).astype(bool)
-
-    # Load v2 file
-    mat_content = scipy.io.loadmat(v2_path, verify_compressed_data_integrity=False)
+    matfilename = os.path.join('databases','hep_proper_mask.mat')
+    mat_content = scipy.io.loadmat(matfilename)
+    X1_masks = np.transpose(mat_content['Y1'], (3, 0, 1, 2))
+    X1_masks = X1_masks.astype(bool)
+    X2_masks = np.transpose(mat_content['Y2'], (3, 0, 1, 2))
+    X2_masks = X2_masks.astype(bool)
+    matfilename = os.path.join('databases','hep_proper_v2.mat')
+    mat_content = scipy.io.loadmat(matfilename, verify_compressed_data_integrity=False)
     X1 = np.transpose(mat_content['X1'], (3, 0, 1, 2))
     X2 = np.transpose(mat_content['X2'], (3, 0, 1, 2))
-
-    Y1 = (np.asarray(mat_content['Y1'][0]) - 1).astype(int)
-    Y2 = (np.asarray(mat_content['Y2'][0]) - 1).astype(int)
+    Y1 = np.asarray(mat_content['Y1'][0]) - 1
+    Y1 = Y1.astype(int)
+    Y2 = np.asarray(mat_content['Y2'][0]) - 1
+    Y2 = Y2.astype(int)
 
     return X1_masks, X2_masks, X1, X2, Y1, Y2
 
+def get_features(image,mask):
+    F = [np.mean(image[mask])]
+    f_name =  ['mean intensity']
 
-from skimage.measure import shannon_entropy
+    F.append(np.std(image[mask]))
+    f_name.append('std')
+   
+    #F.append(np.median(image[mask]))
+    #f_name.append('median intensity')
 
-from skimage.measure import shannon_entropy
-from skimage.feature import greycomatrix, greycoprops
-import numpy as np
+    assert(len(F)==len(f_name))
 
-def get_features(image, mask):
-    pixels = image[mask]  # extract only cell pixels
-
-    F = []
-    f_name = []
-
-    # ------------------------------
-    # 1. Intensity-based features
-    # ------------------------------
-    F.append(np.mean(pixels))
-    f_name.append('mean intensity')
-
-    F.append(np.std(pixels))
-    f_name.append('std intensity')
-
-    F.append(np.median(pixels))
-    f_name.append('median intensity')
-
-    F.append(np.min(pixels))
-    f_name.append('min intensity')
-
-    F.append(np.max(pixels))
-    f_name.append('max intensity')
-
-    # ------------------------------
-    # 2. Texture features
-    # ------------------------------
-    # Entropy
-    F.append(shannon_entropy(pixels))
-    f_name.append('entropy')
-
-    # GLCM texture (contrast & homogeneity)
-    # Use scaled image for GLCM
-    img_uint8 = (image * 255).astype('uint8')
-
-    glcm = greycomatrix(img_uint8,
-                        distances=[1],
-                        angles=[0],
-                        symmetric=True,
-                        normed=True)
-
-    contrast = greycoprops(glcm, 'contrast')[0, 0]
-    homogeneity = greycoprops(glcm, 'homogeneity')[0, 0]
-
-    F.append(contrast)
-    f_name.append('glcm contrast')
-
-    F.append(homogeneity)
-    f_name.append('glcm homogeneity')
-
-    # ------------------------------
-    # 3. Shape features
-    # ------------------------------
-    area = np.sum(mask)
-    F.append(area)
-    f_name.append('area')
-
-    # Shape compactness = area / perimeter^2
-    # Simple perimeter estimate: count boundary pixels
-    perimeter = np.sum(mask ^ np.pad(mask, ((1, 1), (1, 1)), mode='constant')[1:-1, 1:-1])
-
-    # Avoid division by zero
-    compactness = area / (perimeter**2 + 1e-6)
-    F.append(compactness)
-    f_name.append('compactness')
-
-    # ------------------------------
-    # Done
-    # ------------------------------
-    assert len(F) == len(f_name)
     return F, f_name
-
-
 
 def get_all_features(X1,X2):
     # iterate over all training images and get features
