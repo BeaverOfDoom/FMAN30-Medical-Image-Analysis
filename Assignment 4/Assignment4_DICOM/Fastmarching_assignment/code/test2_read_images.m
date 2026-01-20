@@ -1,16 +1,16 @@
 % Step 2 test: mydicomread on CT + MR and display with colorbar + grayscale
 
-% --- Select CT file ---
+% Select CT file 
 [fn,pn] = uigetfile('*.dcm','Select CT-thorax-single.dcm');
 if isequal(fn,0), error('Cancelled'); end
 ctfile = fullfile(pn,fn);
 
-% --- Select MR file ---
+% Select MR file 
 [fn,pn] = uigetfile('*.dcm','Select MR-heart-single.dcm');
 if isequal(fn,0), error('Cancelled'); end
 mrfile = fullfile(pn,fn);
 
-% --- Read CT ---
+% Read CT 
 [infoCT, Ict] = mydicomread(ctfile);
 disp('--- CT summary ---')
 disp(infoCT)
@@ -22,7 +22,7 @@ imagesc(Ict); axis image off;
 colormap gray; colorbar;
 title('CT-thorax-single (scaled, HU)');
 
-% --- Read MR ---
+% Read MR 
 [infoMR, Imr] = mydicomread(mrfile);
 disp('--- MR summary ---')
 disp(infoMR)
@@ -33,6 +33,4 @@ figure;
 imagesc(Imr); axis image off;
 colormap gray; colorbar;
 title('MR-heart-single');
-%%
 
-exportgraphics(gcf,'figures/CT_Thorax_single.png','Resolution',300)

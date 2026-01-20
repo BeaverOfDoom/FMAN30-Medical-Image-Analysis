@@ -251,24 +251,25 @@ close(GUI.Fig);
 
 %---------------------------
 function calculatespeedimage
+%---------------------------
 global GUI
 
 I = double(GUI.IM);
 
-% --- Seed intensity
+% Seed intensity
 I0 = I(GUI.YSeed, GUI.XSeed);
 
-% --- Slider 1: intensity tolerance
+% Slider 1: intensity tolerance 
 sigma = 1 + 5*GUI.Slider1;
 
-% --- Speed: intensity similarity to seed
+% Speed: intensity similarity to seed 
 region = exp( - (I - I0).^2 / (2*sigma^2) );
 
-% --- Avoid zero speed
+% Avoid zero speed
 eps0 = 1e-3;
 GUI.SPEED = eps0 + region;
  
-% --- Run fast marching (unchanged)
+% Run fast marching
 tic;
 switch get(GUI.Handles.methodlistbox,'value')
     case 1

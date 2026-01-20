@@ -21,82 +21,70 @@ if isequal(foldername,0)
     error('No folder selected.');
 end
 
-%Display folder name
-fprintf('Reading the folder %s.\n', foldername);
-
 %--- List DICOM files
-f = dir([foldername filesep '*.dcm']);
-n = numel(f);
+f = dir([foldername filesep '*.dcm']); % Put slices in folder
+n = length(f);
 if n == 0
-    error('No .dcm files found in folder: %s', foldername);
+    error('No .dcm files found in the folder');
 end
 
-%--- Read first slice
+% --- Read info from all slices (only metadata, for sorting)
+zpos = zeros(n,1);
+for k = 1:n
+    filename = fullfile(foldername, f(k).name);
+    infok = mydicominfo(filename);
+
+    % Use ImagePositionPatient (z-coordinate) if it exists
+    if isfield(infok,'ImagePositionPatient') && numel(infok.ImagePositionPatient) >= 3
+        zpos(k) = infok.ImagePositionPatient(3);
+    else
+        % fallback if missing
+        zpos(k) = k;
+    end
+end
+
+% Sort slices by z-position
+[~,order] = sort(zpos,'ascend');
+f = f(order);
+
+% --- Read first slice to know image size
 firstfile = fullfile(foldername, f(1).name);
 [info1, im1] = mydicomread(firstfile);
 
-%--- Preallocate volume (double to keep scaled values)
-im = zeros(size(im1,1), size(im1,2), n);
+rows = size(im1,1);
+cols = size(im1,2);
+
+% Preallocate volume
+im = zeros(rows, cols, n);
 im(:,:,1) = im1;
 
-%--- Helpers for sorting
-inst = nan(n,1);
-zpos = nan(n,1);
-
-if isfield(info1,'InstanceNumber') && ~isempty(info1.InstanceNumber)
-    inst(1) = double(info1.InstanceNumber);
-end
-if isfield(info1,'ImagePositionPatient') && numel(info1.ImagePositionPatient) >= 3
-    zpos(1) = double(info1.ImagePositionPatient(3));
-end
-
-%--- Read remaining slices
-h = waitbar(0,'Reading DICOM folder...');
+% Read remaining slices
+h = waitbar(0,'Reading DICOM slices...');
 for k = 2:n
     filename = fullfile(foldername, f(k).name);
-    [infok, imk] = mydicomread(filename);
+    [~, imk] = mydicomread(filename);
     im(:,:,k) = imk;
-
-    if isfield(infok,'InstanceNumber') && ~isempty(infok.InstanceNumber)
-        inst(k) = double(infok.InstanceNumber);
-    end
-    if isfield(infok,'ImagePositionPatient') && numel(infok.ImagePositionPatient) >= 3
-        zpos(k) = double(infok.ImagePositionPatient(3));
-    end
-
     waitbar(k/n, h);
 end
 close(h);
 
-%--- Sort slices (simple)
-if all(~isnan(zpos))
-    [~, order] = sort(zpos, 'ascend');
-elseif all(~isnan(inst))
-    [~, order] = sort(inst, 'ascend');
-else
-    order = 1:n;
-end
-im = im(:,:,order);
-
 %--- Output info
-info = struct();
 info.Rows = info1.Rows;
 info.Columns = info1.Columns;
 info.PixelSpacing = info1.PixelSpacing;
 info.NumSlices = n;
-info.FileNames = {f(order).name};
+info.FileNames = {f.name};
 
-%--- Z spacing (simple + robust enough for assignment)
-% Prefer header spacing values before position-diff fallback
+% --- Slice spacing dz
 if isfield(info1,'SpacingBetweenSlices') && ~isnan(info1.SpacingBetweenSlices)
     dz = double(info1.SpacingBetweenSlices);
 elseif isfield(info1,'SliceThickness') && ~isnan(info1.SliceThickness)
     dz = double(info1.SliceThickness);
-elseif all(~isnan(zpos))
-    dz = median(abs(diff(sort(zpos))));
 else
-    dz = NaN;
+    % fallback using zpos differences
+    dz = median(abs(diff(sort(zpos))));
 end
 
 info.SliceSpacing = dz;
 info.VoxelSize = [double(info1.PixelSpacing(1)), double(info1.PixelSpacing(2)), dz];
+end

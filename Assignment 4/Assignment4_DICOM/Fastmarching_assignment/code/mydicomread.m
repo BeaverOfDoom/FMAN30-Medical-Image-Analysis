@@ -49,13 +49,13 @@ fclose(fid);
 
 %%%% Reshape the image. Add code here %%%%
 
-im = reshape(im, [double(info.Columns), double(info.Rows)])';
+im = reshape(im, [double(info.Columns), double(info.Rows)])'; % Reshape from DICOM to MatLab row-col
 im = double(im); 
 
 %%%% Rescale image to true intensities. Add code here %%%%
 if isfield(info,'RescaleSlope') && isfield(info,'RescaleIntercept') && ...
         ~isempty(info.RescaleSlope) && ~isempty(info.RescaleIntercept)
-    im = im .* double(info.RescaleSlope) + double(info.RescaleIntercept);
+    im = im .* double(info.RescaleSlope) + double(info.RescaleIntercept); % From raw to HU units. 
 end
 
 

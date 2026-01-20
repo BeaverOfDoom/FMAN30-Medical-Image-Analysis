@@ -1,4 +1,4 @@
-[im, info] = mydicomreadfolder();   % will ask you to pick folder
+[im, info] = mydicomreadfolder();   % pick folder
 
 disp(info)
 
