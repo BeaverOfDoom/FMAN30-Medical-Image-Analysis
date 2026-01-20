@@ -6,18 +6,9 @@ from .shape_model import complex_to_vec, vec_to_complex
 from .resampling import resample_landmarks
 
 
-# ---------------------------------------------------------
-# 1. Initial right-kidney mask (very simple)
-# ---------------------------------------------------------
-
+# 1. Initial right-kidney mask 
 def initial_right_kidney_mask(image):
-    """
-    Very simple initial segmentation:
-      - normalize
-      - Otsu threshold
-      - remove small blobs
-      - pick the largest region on the RIGHT half (right kidney)
-    """
+    
     img = image.astype(float)
     img = (img - img.min()) / (img.max() - img.min() + 1e-8)
 
@@ -51,40 +42,28 @@ def initial_right_kidney_mask(image):
     return kidney_mask
 
 
-# ---------------------------------------------------------
-# 2. Boundary → resampled 14-point landmarks
-# ---------------------------------------------------------
+# 2. Boundary to resampled 14-point landmarks
 
 def extract_boundary_points(mask):
-    """
-    Extract boundary points (x,y) from a binary kidney mask.
-    Returns array of shape (M, 2) with columns [x, y].
-    """
+   
     contours = measure.find_contours(mask.astype(float), level=0.5)
-    if not contours:
-        raise RuntimeError("No contour found in initial segmentation.")
-
+    
     # Take the longest contour
-    contour = max(contours, key=lambda c: c.shape[0])  # (row, col)
+    contour = max(contours, key=lambda c: c.shape[0])
 
-    # Convert to (x,y) = (col,row)
+    # Convert
     boundary_xy = np.column_stack((contour[:, 1], contour[:, 0]))
     return boundary_xy
 
 
 def boundary_to_14_landmarks(boundary_xy, n_points=14):
-    """
-    Take dense boundary points (x,y), resample to n_points and
-    ensure the first landmark is at the BOTTOM of the kidney
-    (largest y).
-    Returns complex vector of length n_points.
-    """
-    pts_cpx = boundary_xy[:, 0] + 1j * boundary_xy[:, 1]  # x + i y
+    
+    pts_cpx = boundary_xy[:, 0] + 1j * boundary_xy[:, 1]  
 
     resampled = resample_landmarks(pts_cpx, n_points=n_points)
-    resampled = np.asarray(resampled).ravel()  # (n_points,)
+    resampled = np.asarray(resampled).ravel() 
 
-    # First landmark at bottom (max y)
+    # First landmark at bottom
     ys = resampled.imag
     bottom_idx = np.argmax(ys)
     resampled = np.roll(resampled, -bottom_idx)
@@ -92,10 +71,7 @@ def boundary_to_14_landmarks(boundary_xy, n_points=14):
     return resampled
 
 
-# ---------------------------------------------------------
 # 3. ASM on a single image
-# ---------------------------------------------------------
-
 def asm_segment_single_image(
     image,
     mean_shape_cpx,
@@ -107,35 +83,17 @@ def asm_segment_single_image(
     conv_thresh=0.1,
     verbose=False,
 ):
-    """
-    ASM-style segmentation of the RIGHT kidney in one DMSA image.
-
-    Inputs:
-      image          : 2D numpy array
-      mean_shape_cpx : complex (N,) mean shape in model coords
-      mean_vec       : (2N,) mean vector used in PCA
-      eigvecs        : (2N, 2N) PCA eigenvectors
-      eigvals        : (2N,) eigenvalues
-      n_modes        : number of modes to use (t)
-      max_iters      : max ASM iterations
-      conv_thresh    : stop if mean landmark movement < this
-
-    Returns:
-      landmarks      : final landmarks in IMAGE coordinates (complex, length N)
-      init_mask      : initial binary mask
-      boundary_xy    : dense boundary points (x,y) from initial mask
-    """
-
+    
     # 1) Initial rough segmentation
     init_mask = initial_right_kidney_mask(image)
     boundary_xy = extract_boundary_points(init_mask)
 
-    # 2) Initial 14-point landmarks on that boundary
+    # 2) Initial 14 point landmarks on that boundary
     N_points = len(mean_shape_cpx)
     landmarks = boundary_to_14_landmarks(boundary_xy, n_points=N_points)
 
-    # Precompute boundary (for nearest-point search)
-    B = boundary_xy  # (M,2), columns x,y
+    # Boundary
+    B = boundary_xy 
 
     # Restrict PCA basis to first n_modes
     P = eigvecs[:, :n_modes]
@@ -144,28 +102,26 @@ def asm_segment_single_image(
     for it in range(max_iters):
         old_landmarks = landmarks.copy()
 
-        # 3) Align landmarks (image coords) to mean shape (model coords)
+        # 3) Align landmarks to mean shape 
         aligned_cpx, s, R, t = similarity_transform(mean_shape_cpx, landmarks)
-        x_vec = complex_to_vec(aligned_cpx)  # (2N,)
+        x_vec = complex_to_vec(aligned_cpx) 
 
         # 4) Compute shape parameters b in PCA space
         diff = x_vec - mean_vec
-        b = P.T @ diff  # (n_modes,)
+        b = P.T @ diff 
 
-        # 5) Clamp b to ±3 sqrt(lambda)
+        # 5) Limit b to +-3 sqrt(lambda)
         for i in range(n_modes):
             limit = 3 * np.sqrt(lambdas[i])
             b[i] = np.clip(b[i], -limit, limit)
 
-        # 6) Reconstruct constrained shape in MODEL coordinates
+        # 6) Reconstruct constrained shape in coordinates
         x_new_vec = mean_vec + P @ b
         recon_cpx = vec_to_complex(x_new_vec)
 
-        # 7) Transform back to IMAGE coordinates (inverse transform)
-        Z = np.column_stack((recon_cpx.real, recon_cpx.imag))  # (N,2)
-        # Forward used: X_model ≈ s * R @ Y_image + t
-        # So inverse:   Y_image ≈ (1/s) * R^T @ (X_model - t)
-        Y = (1.0 / s) * (R.T @ (Z.T - t.reshape(2, 1))).T  # (N,2)
+        # 7) Transform back to image coordinates 
+        Z = np.column_stack((recon_cpx.real, recon_cpx.imag))
+        Y = (1.0 / s) * (R.T @ (Z.T - t.reshape(2, 1))).T  
         landmarks_pred = Y[:, 0] + 1j * Y[:, 1]
 
         # 8) Snap each landmark to nearest boundary point
@@ -179,8 +135,6 @@ def asm_segment_single_image(
 
         # 9) Check convergence
         mean_disp = np.mean(np.abs(landmarks - old_landmarks))
-        if verbose:
-            print(f"Iter {it+1}: mean landmark displacement = {mean_disp:.3f} px")
         if mean_disp < conv_thresh:
             break
 
